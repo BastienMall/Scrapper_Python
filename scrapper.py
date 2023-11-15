@@ -1,24 +1,61 @@
 import requests
-from bs4 import BeautifulSoup as bs
+from bs4 import BeautifulSoup
+import csv
 
-url="https://quotes.toscrape.com/"
+def scrape_page(soup, quotes):
+
+    quote_elements = soup.find_all('div', class_='quote')
+
+    for quote_element in quote_elements:
+
+        text = quote_element.find('span', class_='text').text
+
+        author = quote_element.find('small', class_='author').text
+
+        tag_elements = quote_element.find('div', class_='tags').find_all('a', class_='tag')
+
+        tags = []
+        for tag_element in tag_elements:
+            tags.append(tag_element.text)
+
+        quotes.append(
+            {
+                'text': text,
+                'author': author,
+                'tags': ', '.join(tags) 
+            }
+        )
+
+url = 'https://quotes.toscrape.com'
+
 page = requests.get(url)
 
-html = page.content
+soup = BeautifulSoup(page.text, 'html.parser')
 
-soup = bs(page.text, 'html.parser')
+quotes = []
 
-# text_elements = soup.text.get_text()
-authors_elements = soup.find_all(class_='author')
+scrape_page(soup, quotes)
 
-print(soup.span.get_text())
-print(authors_elements)
+next_li_element = soup.find('li', class_='next')
 
+while next_li_element is not None:
+    next_page_relative_url = next_li_element.find('a', href=True)['href']
 
-titre_articles = soup.find_all(class_='text')
-for titre in titre_articles:
-    print(titre.get_text(strip=True))
+    page = requests.get(url + next_page_relative_url)
 
-authors_articles = soup.find_all(class_='author')
-for author in authors_articles:
-    print(author.get_text(strip=True))
+    soup = BeautifulSoup(page.text, 'html.parser')
+
+    scrape_page(soup, quotes)
+
+    next_li_element = soup.find('li', class_='next')
+
+csv_file = open('quotes.csv', 'w', encoding='utf-8', newline='')
+
+writer = csv.writer(csv_file)
+
+writer.writerow(['Text', 'Author', 'Tags'])
+
+for quote in quotes:
+    writer.writerow(quote.values())
+
+csv_file.close()
